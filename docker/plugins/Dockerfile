@@ -2,11 +2,6 @@
 ARG RUNTIME="go1.15.5"
 ARG BBOX="quay.io/gravitational/teleport-buildbox"
 FROM $BBOX:$RUNTIME
-
-# The base image (buildbox:latest) is built by running `make -C build.assets`
-# from the teleport repo directory $GOPATH/gravitational.com/teleport
-ARG RUNTIME="go1.15.5"
-FROM quay.io/gravitational/teleport-buildbox:$RUNTIME
 RUN apt-get update
 
 # DEBUG=1 is needed for the Web UI to be loaded from static assets instead
