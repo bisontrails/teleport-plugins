@@ -8,7 +8,7 @@ MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 
 # Teleport Enterprise Binary release name. Can be any teleport
 # enterprise version, but has to be available on get.gravitational.com
-RELEASE ?= teleport-ent-v5.0.0-linux-amd64-bin
+RELEASE ?= teleport-ent-v6.0.0-alpha.2-linux-amd64-bin
 
 RUNTIME ?= go1.15.5
 BBOX ?= quay.io/gravitational/teleport-buildbox:$(RUNTIME)
@@ -52,8 +52,11 @@ enter-teleport:
 #
 .PHONY: teleport-ent
 teleport-ent:
-	docker build -t teleport-ent:latest -f ./teleport/Dockerfile \
-		--build-arg RELEASE=$(RELEASE) .
+	docker build \
+		-t teleport-ent:latest \
+		-f ./teleport/Dockerfile \
+		--build-arg RELEASE=$(RELEASE) \
+		.
 
 # `make config` provisions configs for the `teleport cluster:
 # 1. Creates the role and user for tests
@@ -72,7 +75,6 @@ config:
 	docker-compose exec teleport /bin/bash -c "tctl auth sign --format=tls --user=access-plugin --out=plug"
 	docker-compose exec teleport /bin/bash -c "mkdir -p /mnt/shared/certs/access-plugin && mv plug.* /mnt/shared/certs/access-plugin/"
 
-
 	docker-compose stop teleport
 
 .PHONY: foo-certs
@@ -86,8 +88,12 @@ foo-certs:
 #
 .PHONY: plugins
 plugins: build-plugins
-	docker build -t teleport-plugins:latest . -f ./plugins/Dockerfile \
-		--build-arg RUNTIME=$(RUNTIME)
+	docker build \
+		-t teleport-plugins:latest \
+		-f ./plugins/Dockerfile \
+		--build-arg RUNTIME=$(RUNTIME) \
+		--build-arg BBOX=$(BBOX) \
+		.
 
 # Builds all of the extensions inside the build box docker container.
 #
