@@ -69,6 +69,17 @@ func (b *Bot) Post(ctx context.Context, reqID string, reqData RequestData) (data
 	return
 }
 
+func (b *Bot) AutoApprove(ctx context.Context, reqID string, reqData RequestData) (data SlackData, err error) {
+	reqData.SlackUserEmail = ":white_check_mark: auto-approve-bot :computer:"
+	data.ChannelID, data.Timestamp, err = b.client.PostMessageContext(
+		ctx,
+		b.channel,
+		slack.MsgOptionBlocks(b.msgSections(reqID, reqData, "APPROVED")...),
+	)
+	err = trace.Wrap(err)
+	return
+}
+
 // Expire updates request's Slack post with EXPIRED status and removes action buttons.
 func (b *Bot) Expire(ctx context.Context, reqID string, reqData RequestData, slackData SlackData) error {
 	_, _, _, err := b.client.UpdateMessageContext(
