@@ -1,4 +1,4 @@
-VERSION=0.2.0
+VERSION=0.2.1
 
 BUILDDIR ?= build
 BINARY = $(BUILDDIR)/teleport-slack
@@ -54,8 +54,6 @@ $(VERSRC): Makefile
 	VERSION=$(VERSION) $(MAKE) -f version.mk setver
 
 .PHONY: docker
-.PHONY: docker-push
-
 docker: $(VERSRC)
 	cd ../.. && docker build -t teleport-slackbot:$(VERSION) -f access/slack/Dockerfile .
 
@@ -67,7 +65,9 @@ ifndef AWS_SECRET_ACCESS_KEY
 	$(error AWS_SECRET_ACCESS_KEY is undefined)
 endif
 
+.PHONY: docker-push
 docker-push: check-aws-env $(VERSRC) docker
-	ACCOUNT = $(shell aws sts get-caller-identity --query 'Account' --output text)
-	docker tag teleport-slackbot:$(VERSION)
+	$(eval ACCOUNT := $(shell aws sts get-caller-identity --query 'Account' --output text))
+	aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin $(ACCOUNT).dkr.ecr.us-east-2.amazonaws.com
+	docker tag teleport-slackbot:$(VERSION) $(ACCOUNT).dkr.ecr.us-east-2.amazonaws.com/teleport-slackbot:$(VERSION)
 	docker push $(ACCOUNT).dkr.ecr.us-east-2.amazonaws.com/teleport-slackbot:$(VERSION)

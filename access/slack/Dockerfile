@@ -1,12 +1,11 @@
 FROM golang:1.14.15-buster
 
 RUN update-ca-certificates
-RUN wget https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 --output-file /usr/bin/jq
 
-COPY . /source
-WORKDIR /source
+COPY . /app
+WORKDIR /app
 RUN make access-slack
-COPY access/slack/build/teleport-slack /teleport-slack
-RUN rm -r /source
+RUN cp /app/access/slack/build/teleport-slack /usr/local/bin/teleport-slack
+RUN rm -r /app
 
-CMD ["sh", "init.sh"]
+ENTRYPOINT ["/usr/local/bin/teleport-slack", "start"]
