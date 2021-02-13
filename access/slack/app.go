@@ -259,7 +259,7 @@ func (a *App) onSlackCallback(ctx context.Context, cb Callback) error {
 		).Infof("Slack user %s the request", resolution)
 
 		// Simply fill reqData from the request itself.
-		reqData = RequestData{User: req.User, Roles: req.Roles}
+		reqData = RequestData{User: req.User, Roles: req.Roles, RequestReason: req.RequestReason}
 	}
 
 	a.Spawn(func(ctx context.Context) error {
@@ -284,7 +284,7 @@ func (a *App) tryFetchEmail(ctx context.Context, userID string) string {
 }
 
 func (a *App) onPendingRequest(ctx context.Context, req access.Request) error {
-	reqData := RequestData{User: req.User, Roles: req.Roles}
+	reqData := RequestData{User: req.User, Roles: req.Roles, RequestReason: req.RequestReason}
 	slackData, err := a.bot.Post(ctx, req.ID, reqData)
 	if err != nil {
 		return trace.Wrap(err)

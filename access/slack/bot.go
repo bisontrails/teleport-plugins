@@ -148,6 +148,10 @@ func (b *Bot) msgSections(reqID string, reqData RequestData, status string) []sl
 	if reqData.Roles != nil {
 		msgFieldToBuilder(&builder, "Role(s)", strings.Join(reqData.Roles, ","))
 	}
+	if reqData.RequestReason == "" {
+		reqData.RequestReason = ""
+	}
+	msgFieldToBuilder(&builder, "Reason", reqData.RequestReason)
 
 	var statusEmoji string
 	switch status {
@@ -218,6 +222,6 @@ func msgFieldToBuilder(b *strings.Builder, field, value string) {
 	b.WriteString("*")
 	b.WriteString(field)
 	b.WriteString("*: ")
-	b.WriteString(value)
+	b.WriteString(value) // TODO vet for injection vulns
 	b.WriteString("\n")
 }
