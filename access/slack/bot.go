@@ -159,8 +159,10 @@ func (b *Bot) msgSections(reqID string, reqData RequestData, status string) []sl
 		statusEmoji = ":hourglass_flowing_sand:"
 	case "APPROVED":
 		statusEmoji = ":white_check_mark:"
+		msgFieldToBuilder(&builder, "Approval", reqData.SlackUser)
 	case "DENIED":
 		statusEmoji = ":x:"
+		msgFieldToBuilder(&builder, "Denier", reqData.SlackUser)
 	case "EXPIRED":
 		statusEmoji = ":hourglass:"
 	}

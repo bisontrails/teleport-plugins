@@ -259,7 +259,7 @@ func (a *App) onSlackCallback(ctx context.Context, cb Callback) error {
 		).Infof("Slack user %s the request", resolution)
 
 		// Simply fill reqData from the request itself.
-		reqData = RequestData{User: req.User, Roles: req.Roles, RequestReason: req.RequestReason}
+		reqData = RequestData{User: req.User, Roles: req.Roles, RequestReason: req.RequestReason, SlackUser: userEmail}
 	}
 
 	a.Spawn(func(ctx context.Context) error {
