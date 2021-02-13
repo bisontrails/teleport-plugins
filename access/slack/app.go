@@ -190,6 +190,64 @@ func (a *App) onWatcherEvent(ctx context.Context, event access.Event) error {
 	}
 }
 
+func (a *App) processSlackCallback(ctx context.Context, req access.Request, cb Callback) (RequestData, string, error) {
+	action := cb.ActionCallback.BlockActions[0]
+	actionID := action.ActionID
+
+	reqData := RequestData{User: req.User, Roles: req.Roles, RequestReason: req.RequestReason}
+	// already handled elsewhere
+	switch req.State {
+	case access.StateApproved:
+		reqData.SlackUserEmail = "processed by another approval flow (tctl)"
+		return reqData, "APPROVED", nil
+	case access.StateDenied:
+		reqData.SlackUserEmail = "processed by another approval flow (tctl)"
+		return reqData, "DENIED", nil
+	}
+
+	if req.State != access.StatePending {
+		return RequestData{}, "", trace.Errorf("cannot process not pending request: %+v", req)
+	}
+
+	reqData.SlackUserEmail = a.tryFetchEmail(logger.SetFields(ctx, logger.Fields{
+		"slack_user":    cb.User.Name,
+		"slack_channel": cb.Channel.Name,
+	}), cb.User.ID)
+
+	var (
+		reqState    access.State
+		resolution  string
+		slackStatus string
+	)
+
+	switch actionID {
+	case ActionApprove:
+		reqState = access.StateApproved
+		slackStatus = "APPROVED"
+		resolution = "approved"
+	case ActionDeny:
+		reqState = access.StateDenied
+		slackStatus = "DENIED"
+		resolution = "denied"
+	default:
+		return RequestData{}, "", trace.BadParameter("Unknown ActionID: %s", actionID)
+	}
+
+	if err := a.accessClient.SetRequestState(ctx, req.ID, reqState, reqData.SlackUserEmail); err != nil {
+		return RequestData{}, "", trace.Wrap(err)
+	}
+	logger.Get(ctx).WithFields(
+		logger.Fields{
+			"slack_user_email": reqData.SlackUserEmail,
+			"request_user":     req.User,
+			"request_roles":    req.Roles,
+		},
+	).Infof("Slack user %s the request", resolution)
+
+	// Simply fill reqData from the request itself.
+	return reqData, slackStatus, nil
+}
+
 // OnSlackCallback processes Slack actions and updates original Slack message with a new status
 func (a *App) onSlackCallback(ctx context.Context, cb Callback) error {
 	if len(cb.ActionCallback.BlockActions) != 1 {
@@ -199,67 +257,28 @@ func (a *App) onSlackCallback(ctx context.Context, cb Callback) error {
 
 	action := cb.ActionCallback.BlockActions[0]
 	reqID := action.Value
-	actionID := action.ActionID
-
-	var slackStatus string
 
 	ctx, _ = logger.WithField(ctx, "request_id", reqID)
 	req, err := a.accessClient.GetRequest(ctx, reqID)
+	if err != nil && !trace.IsNotFound(err) {
+		return trace.Wrap(err)
+	}
+
+	var slackStatus string
 	var reqData RequestData
-
 	if err != nil {
-		if trace.IsNotFound(err) {
-			// Request wasn't found, need to expire it's post in Slack
-			slackStatus = "EXPIRED"
+		// Request wasn't found, need to expire it's post in Slack
+		slackStatus = "EXPIRED"
 
-			// And try to fetch its request data if it exists
-			var pluginData PluginData
-			pluginData, _ = a.getPluginData(ctx, reqID)
-			reqData = pluginData.RequestData
-		} else {
-			return trace.Wrap(err)
-		}
+		// And try to fetch its request data if it exists
+		var pluginData PluginData
+		pluginData, _ = a.getPluginData(ctx, reqID)
+		reqData = pluginData.RequestData
 	} else {
-		if req.State != access.StatePending {
-			return trace.Errorf("cannot process not pending request: %+v", req)
-		}
-
-		userEmail := a.tryFetchEmail(logger.SetFields(ctx, logger.Fields{
-			"slack_user":    cb.User.Name,
-			"slack_channel": cb.Channel.Name,
-		}), cb.User.ID)
-
-		var (
-			reqState   access.State
-			resolution string
-		)
-
-		switch actionID {
-		case ActionApprove:
-			reqState = access.StateApproved
-			slackStatus = "APPROVED"
-			resolution = "approved"
-		case ActionDeny:
-			reqState = access.StateDenied
-			slackStatus = "DENIED"
-			resolution = "denied"
-		default:
-			return trace.BadParameter("Unknown ActionID: %s", actionID)
-		}
-
-		if err := a.accessClient.SetRequestState(ctx, req.ID, reqState, userEmail); err != nil {
+		reqData, slackStatus, err = a.processSlackCallback(ctx, req, cb)
+		if err != nil {
 			return trace.Wrap(err)
 		}
-		logger.Get(ctx).WithFields(
-			logger.Fields{
-				"slack_user_email": userEmail,
-				"request_user":     req.User,
-				"request_roles":    req.Roles,
-			},
-		).Infof("Slack user %s the request", resolution)
-
-		// Simply fill reqData from the request itself.
-		reqData = RequestData{User: req.User, Roles: req.Roles, RequestReason: req.RequestReason, SlackUser: userEmail}
 	}
 
 	a.Spawn(func(ctx context.Context) error {
