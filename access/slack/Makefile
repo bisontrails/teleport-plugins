@@ -65,8 +65,11 @@ ifndef AWS_SECRET_ACCESS_KEY
 	$(error AWS_SECRET_ACCESS_KEY is undefined)
 endif
 
+.PHONY: docker-release
+docker-release: docker docker-push
+
 .PHONY: docker-push
-docker-push: check-aws-env $(VERSRC) docker
+docker-push: check-aws-env $(VERSRC) 
 	$(eval ACCOUNT := $(shell aws sts get-caller-identity --query 'Account' --output text))
 	aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin $(ACCOUNT).dkr.ecr.us-east-2.amazonaws.com
 	docker tag teleport-slackbot:$(VERSION) $(ACCOUNT).dkr.ecr.us-east-2.amazonaws.com/teleport-slackbot:$(VERSION)
