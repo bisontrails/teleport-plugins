@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"strings"
 
 	"github.com/gravitational/teleport-plugins/access"
@@ -24,6 +25,8 @@ type PluginData struct {
 }
 
 func DecodePluginData(dataMap access.PluginDataMap) (data PluginData) {
+	log.Printf("Decoding data: %+v \n", dataMap)
+
 	data.User = dataMap["user"]
 	data.Roles = strings.Split(dataMap["roles"], ",")
 	data.ChannelID = dataMap["channel_id"]
@@ -34,6 +37,8 @@ func DecodePluginData(dataMap access.PluginDataMap) (data PluginData) {
 }
 
 func EncodePluginData(data PluginData) access.PluginDataMap {
+	log.Printf("Encoding data: %+v \n", data)
+
 	return access.PluginDataMap{
 		"user":           data.User,
 		"roles":          strings.Join(data.Roles, ","),

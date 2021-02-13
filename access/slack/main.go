@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -40,6 +41,8 @@ const (
 )
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.LUTC | log.Llongfile)
+
 	logger.Init()
 	app := kingpin.New("teleport-slack", "Teleport plugin for access requests approval via Slack.")
 

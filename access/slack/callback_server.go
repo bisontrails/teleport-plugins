@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	dlog "log"
 	"net/http"
 	"net/url"
 	"sync/atomic"
@@ -82,6 +83,8 @@ func (s *CallbackServer) EnsureCert() error {
 }
 
 func (s *CallbackServer) processCallback(rw http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	dlog.Println("Handling new request")
+
 	ctx, cancel := context.WithTimeout(r.Context(), time.Millisecond*2500) // Slack requires to respond within 3000 milliseconds
 	defer cancel()
 
@@ -105,6 +108,7 @@ func (s *CallbackServer) processCallback(rw http.ResponseWriter, r *http.Request
 	// tee body into verifier as it is read.
 	r.Body = ioutil.NopCloser(io.TeeReader(r.Body, &sv))
 	payload := []byte(r.FormValue("payload"))
+	dlog.Println("payload\n\t", string(payload))
 
 	// the FormValue method exhausts the reader, so signature
 	// verification can now proceed.
@@ -120,6 +124,7 @@ func (s *CallbackServer) processCallback(rw http.ResponseWriter, r *http.Request
 		http.Error(rw, "", http.StatusBadRequest)
 		return
 	}
+	dlog.Println("Callback", cb)
 
 	if err := s.onCallback(ctx, Callback(cb)); err != nil {
 		log.WithError(err).Error("Failed to process callback")
