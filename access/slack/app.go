@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/gravitational/teleport-plugins/access"
@@ -307,7 +308,23 @@ func (a *App) onPendingRequest(ctx context.Context, req access.Request) error {
 
 	var slackData SlackData
 	var err error
-	if true {
+	var approved bool
+
+	autoApproving := os.Getenv("ENABLE_AUTO_APPROVE") == "true"
+	logger.Get(ctx).Println("AutoApprove status: ", autoApproving)
+
+	// TODO actually have rules to this
+	if autoApproving {
+		err := a.accessClient.SetRequestState(ctx, req.ID, access.StateApproved, "auto-approve-bot")
+		if err != nil {
+			trace.WrapWithMessage(err, "Auto approve bot failed to approve a request, proceeding to the slack fallback")
+			approved = false
+		} else {
+			approved = true
+		}
+	}
+
+	if approved {
 		slackData, err = a.bot.AutoApprove(ctx, req.ID, reqData)
 	} else {
 		slackData, err = a.bot.Post(ctx, req.ID, reqData)
@@ -315,6 +332,7 @@ func (a *App) onPendingRequest(ctx context.Context, req access.Request) error {
 	if err != nil {
 		return trace.Wrap(err)
 	}
+
 	logger.Get(ctx).WithFields(logger.Fields{
 		"slack_channel":   slackData.ChannelID,
 		"slack_timestamp": slackData.Timestamp,
