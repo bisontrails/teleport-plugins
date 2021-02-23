@@ -1,4 +1,4 @@
-VERSION=0.2.1
+VERSION=0.2.2
 
 BUILDDIR ?= build
 BINARY = $(BUILDDIR)/teleport-slack
@@ -69,7 +69,7 @@ endif
 docker-release: docker docker-push
 
 .PHONY: docker-push
-docker-push: check-aws-env $(VERSRC) 
+docker-push: check-aws-env $(VERSRC)
 	$(eval ACCOUNT := $(shell aws sts get-caller-identity --query 'Account' --output text))
 	aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin $(ACCOUNT).dkr.ecr.us-east-2.amazonaws.com
 	docker tag teleport-slackbot:$(VERSION) $(ACCOUNT).dkr.ecr.us-east-2.amazonaws.com/teleport-slackbot:$(VERSION)

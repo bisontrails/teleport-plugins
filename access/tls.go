@@ -30,8 +30,9 @@ func LoadTLSConfig(certPath, keyPath, rootCAsPath string) (conf *tls.Config, err
 		err = trace.Wrap(ErrInvalidCertificate, "certificate seems to be invalid, check its notBefore date.")
 	}
 	conf = &tls.Config{
-		Certificates: []tls.Certificate{clientCert},
-		RootCAs:      caPool,
+		Certificates:       []tls.Certificate{clientCert},
+		RootCAs:            caPool,
+		InsecureSkipVerify: os.Getenv("SKIP_VERIFY") == "true",
 	}
 	return
 }

@@ -59,6 +59,12 @@ func NewCallbackServer(conf lib.HTTPConfig, secret string, readOnly bool, onCall
 		}
 	}
 
+	httpSrv.GET("/healthz", func(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		rw.Header().Add("Content-Type", "application/json")
+		rw.Write([]byte(`{"ok": true}`))
+		rw.WriteHeader(200)
+	})
+
 	httpSrv.POST("/", srv.processCallback)
 	return srv, nil
 }
