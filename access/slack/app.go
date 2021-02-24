@@ -196,7 +196,7 @@ func (a *App) processSlackCallback(ctx context.Context, req access.Request, cb C
 	actionID := action.ActionID
 
 	reqData := RequestData{User: req.User, Roles: req.Roles, RequestReason: req.RequestReason}
-	// already handled elsewhere
+	// handle when this request was completed by another approval workflow
 	switch req.State {
 	case access.StateApproved:
 		reqData.SlackUserEmail = "processed by another approval flow (tctl)"
