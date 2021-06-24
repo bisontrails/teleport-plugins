@@ -303,32 +303,71 @@ func (a *App) tryFetchEmail(ctx context.Context, userID string) string {
 	return userEmail
 }
 
+type botAction string
+
+const (
+	autoApproved botAction = "autoApproved"
+	autoDenied   botAction = "autoDenied"
+	promptSlack  botAction = "promptSlack"
+)
+
+func (a *App) autoProcess(ctx context.Context, req access.Request, reqData RequestData) (string, botAction) {
+	if reqData.RequestReason == "" {
+		reason := "Missing Request Reason"
+		err := a.accessClient.SetRequestStateExt(ctx, req.ID, access.RequestStateParams{
+			State:     access.StateDenied,
+			Delegator: "auto-deny-bot",
+			Reason:    reason,
+		})
+		if err != nil {
+			trace.WrapWithMessage(err, "Auto deny bot failed to deny an empty request, proceeding to the slack fallback")
+			return "", promptSlack
+		}
+
+		return reason, autoDenied
+	}
+
+	// more complex logic can start here
+	reason := "Auto Approved by Slackbot"
+	err := a.accessClient.SetRequestStateExt(ctx, req.ID, access.RequestStateParams{
+		State:     access.StateApproved,
+		Delegator: "auto-approve-bot",
+		Reason:    reason,
+	})
+	if err != nil {
+		trace.WrapWithMessage(err, "Auto approve bot failed to approve a request, proceeding to the slack fallback")
+		return "", promptSlack
+	}
+
+	return reason, autoApproved
+}
+
 func (a *App) onPendingRequest(ctx context.Context, req access.Request) error {
 	reqData := RequestData{User: req.User, Roles: req.Roles, RequestReason: req.RequestReason}
 
 	var slackData SlackData
 	var err error
-	var approved bool
+	var reason string
+	action := promptSlack
 
 	autoApproving := os.Getenv("ENABLE_AUTO_APPROVE") == "true"
 	logger.Get(ctx).Println("AutoApprove status: ", autoApproving)
 
-	// TODO actually have rules to this
 	if autoApproving {
-		err := a.accessClient.SetRequestState(ctx, req.ID, access.StateApproved, "auto-approve-bot")
-		if err != nil {
-			trace.WrapWithMessage(err, "Auto approve bot failed to approve a request, proceeding to the slack fallback")
-			approved = false
-		} else {
-			approved = true
-		}
+		reason, action = a.autoProcess(ctx, req, reqData)
 	}
 
-	if approved {
+	switch action {
+	case autoApproved:
+		reqData.ResolveReason = reason
 		slackData, err = a.bot.AutoApprove(ctx, req.ID, reqData)
-	} else {
+	case promptSlack:
 		slackData, err = a.bot.Post(ctx, req.ID, reqData)
+	case autoDenied:
+		reqData.ResolveReason = reason
+		slackData, err = a.bot.AutoDeny(ctx, req.ID, reqData)
 	}
+
 	if err != nil {
 		return trace.Wrap(err)
 	}
