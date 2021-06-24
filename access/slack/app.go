@@ -303,32 +303,59 @@ func (a *App) tryFetchEmail(ctx context.Context, userID string) string {
 	return userEmail
 }
 
+type botAction string
+
+const (
+	autoApproved botAction = "autoApproved"
+	emptyReason  botAction = "Empty Reason"
+	promptSlack  botAction = "promptSlack"
+)
+
+func (a *App) autoProcess(ctx context.Context, req access.Request, reqData RequestData) botAction {
+	if reqData.RequestReason == "" {
+		err := a.accessClient.SetRequestState(ctx, req.ID, access.StateDenied, "auto-deny-bot")
+		if err != nil {
+			trace.WrapWithMessage(err, "Auto deny bot failed to deny an empty request, proceeding to the slack fallback")
+			return promptSlack
+		}
+
+		return emptyReason
+	}
+
+	// more complex logic can start here
+	err := a.accessClient.SetRequestState(ctx, req.ID, access.StateApproved, "auto-approve-bot")
+	if err != nil {
+		trace.WrapWithMessage(err, "Auto approve bot failed to approve a request, proceeding to the slack fallback")
+		return promptSlack
+	}
+
+	return autoApproved
+}
+
 func (a *App) onPendingRequest(ctx context.Context, req access.Request) error {
 	reqData := RequestData{User: req.User, Roles: req.Roles, RequestReason: req.RequestReason}
 
 	var slackData SlackData
 	var err error
-	var approved bool
+	action := promptSlack
 
 	autoApproving := os.Getenv("ENABLE_AUTO_APPROVE") == "true"
 	logger.Get(ctx).Println("AutoApprove status: ", autoApproving)
 
-	// TODO actually have rules to this
 	if autoApproving {
-		err := a.accessClient.SetRequestState(ctx, req.ID, access.StateApproved, "auto-approve-bot")
-		if err != nil {
-			trace.WrapWithMessage(err, "Auto approve bot failed to approve a request, proceeding to the slack fallback")
-			approved = false
-		} else {
-			approved = true
-		}
+		action = a.autoProcess(ctx, req, reqData)
 	}
 
-	if approved {
+	switch action {
+	case autoApproved:
 		slackData, err = a.bot.AutoApprove(ctx, req.ID, reqData)
-	} else {
+	case promptSlack:
 		slackData, err = a.bot.Post(ctx, req.ID, reqData)
+	case emptyReason:
+	default:
+		slackData, err = a.bot.AutoDeny(ctx, req.ID, reqData, string(action))
 	}
+
 	if err != nil {
 		return trace.Wrap(err)
 	}

@@ -80,6 +80,17 @@ func (b *Bot) AutoApprove(ctx context.Context, reqID string, reqData RequestData
 	return
 }
 
+func (b *Bot) AutoDeny(ctx context.Context, reqID string, reqData RequestData, rejectReason string) (data SlackData, err error) {
+	reqData.SlackUserEmail = ":x: auto-deny-bot :sad-computer:"
+	data.ChannelID, data.Timestamp, err = b.client.PostMessageContext(
+		ctx,
+		b.channel,
+		slack.MsgOptionBlocks(b.msgSections(reqID, reqData, "DENIED: "+rejectReason)...),
+	)
+	err = trace.Wrap(err)
+	return
+}
+
 // Expire updates request's Slack post with EXPIRED status and removes action buttons.
 func (b *Bot) Expire(ctx context.Context, reqID string, reqData RequestData, slackData SlackData) error {
 	_, _, _, err := b.client.UpdateMessageContext(
